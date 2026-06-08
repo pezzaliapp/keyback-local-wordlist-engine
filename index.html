@@ -1,86 +1,40 @@
-<!doctype html>
-<html lang="it">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KeyBack Local Recovery</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main class="wrap">
-    <header class="hero">
-      <h1>🔐 KeyBack Local Recovery <span>v1</span></h1>
-      <p>Genera una wordlist personale e verifica uno ZIP cifrato con lo script Python locale incluso.</p>
-    </header>
-
-    <section class="card">
-      <h2>1. Wordlist personale</h2>
-      <div class="grid">
-        <label>Parole personali, una per riga
-          <textarea id="words">Alessandro
-Parma
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KeyBack Local v9</title><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"></head><body>
+<header><div><h1>🔐 KeyBack Local <span>v9 completa + recovery</span></h1><p>Analisi locale file/ZIP, report risultati, motore wordlist completo e script Python locale per verificare davvero lo ZIP.</p></div><button id="installBtn" class="hidden">Installa PWA</button></header>
+<main>
+<section class="card"><h2>1. Scansione file / ZIP</h2><p>Carica file, cartelle o ZIP. Tutto resta nel browser.</p><div class="row"><button id="browseFilesBtn">Scegli file</button><button id="browseFolderBtn">Scegli cartella</button><button id="scanBtn">Analizza selezione</button><button id="clearBtn">Pulisci risultati</button><button id="exportBtn">Esporta JSON</button><button id="exportCsvBtn">Esporta CSV</button></div><input id="fileInput" type="file" multiple hidden><input id="folderInput" type="file" multiple webkitdirectory hidden><div id="fileInfo" class="status">Nessun file selezionato.</div><div id="progressSection" class="hidden"><div class="bar"><div id="progressFill"></div></div><div id="progressStatus"></div><pre id="progressLog"></pre></div></section>
+<section class="card"><h2>2. Testo libero</h2><textarea id="textInput" placeholder="Incolla testo, log, config, .env, note personali..."></textarea><div class="row"><button id="scanTextBtn">Analizza testo</button></div></section>
+<section id="resultsSection" class="card"><h2>3. Risultati / Report</h2><div id="summaryStats" class="stats"></div><div id="resultsList"></div></section>
+<section class="grid"><div class="card"><h2>4. Dizionari</h2><p>Seleziona categorie interne o importa TXT/CSV personali.</p><label>Parole personali, una per riga</label><textarea id="customWords">Parma
 Cane
 Oggi
 Listino
 Cliente
 Carlotta
 Luna
-Mare
-Casa</textarea>
-        </label>
-        <label>Anni / numeri, uno per riga
-          <textarea id="nums">2024
-2025
-2026
-43
+Mare</textarea><div class="checks">
+<label><input class="dict" value="nomi_it" type="checkbox" checked> Nomi / persone</label>
+<label><input class="dict" value="cognomi_it" type="checkbox" checked> Cognomi</label>
+<label><input class="dict" value="comuni_it" type="checkbox" checked> Comuni / luoghi</label>
+<label><input class="dict" value="animali_it" type="checkbox" checked> Specie animali</label>
+<label><input class="dict" value="nomi_animali_it" type="checkbox" checked> Nomi animali/pet</label>
+<label><input class="dict" value="mesi_it" type="checkbox" checked> Mesi</label>
+<label><input class="dict" value="parole_it" type="checkbox" checked> Parole comuni</label>
+</div><input id="importDict" type="file" multiple accept=".txt,.csv"><button id="loadDictBtn">Aggiorna conteggio</button><div id="dictStatus" class="status"></div><div class="status">Termini disponibili: <b id="wordCount">0</b></div></div>
+<div class="card"><h2>5. Numeri / anni completi</h2><div class="cols"><label>Anno iniziale<input id="yearStart" type="number" value="1950"></label><label>Anno finale<input id="yearEnd" type="number" value="2035"></label></div><div class="cols"><label>Numero iniziale<input id="numStart" type="number" value="0"></label><label>Numero finale<input id="numEnd" type="number" value="9999"></label></div><label>Padding numeri</label><select id="padding"><option value="none">1, 2, 10</option><option value="2" selected>01, 02, 10</option><option value="3">001, 002, 010</option><option value="4">0001, 0002, 0010</option></select><label>Numeri/anni extra, uno per riga</label><textarea id="extraNumbers">43
 123
-666</textarea>
-        </label>
-      </div>
-      <div class="grid small">
-        <label>Simboli / separatori
-          <input id="seps" value="- _ . ! @ !! #">
-        </label>
-        <label>Limite combinazioni
-          <input id="limit" type="number" value="250000" min="100" max="2000000">
-        </label>
-      </div>
-      <label>Template, uno per riga
-        <textarea id="templates">{word}-{word}-{num}
-{word}_{word}_{num}
-{word}{num}
-{word}{sep}{num}
-@{word}!!{num}{cap}
-{word}{sep}{word}
-{word}{sep}{word}{sep}{num}</textarea>
-      </label>
-      <div class="actions">
-        <button id="gen">Genera wordlist</button>
-        <button id="download" disabled>Scarica wordlist.txt</button>
-        <button id="copy" disabled>Copia</button>
-      </div>
-      <p id="stats" class="note">Pronto.</p>
-      <pre id="preview"></pre>
-    </section>
+2024
+2025
+2026</textarea><label>Simboli/separatori</label><input id="symbols" value="- _ . ! @ # !!">
+<div class="status">Numeri: <b id="numberCount">0</b> · Anni: <b id="yearCount">0</b></div></div></section>
+<section class="card"><h2>6. Wordlist Engine</h2><p>Placeholder: <code>{parola}</code> <code>{nome}</code> <code>{persona}</code> <code>{cognome}</code> <code>{comune}</code> <code>{animale}</code> <code>{specie}</code> <code>{pet}</code> <code>{nomeanimale}</code> <code>{mese}</code> <code>{anno}</code> <code>{numero}</code> <code>{simbolo}</code> <code>{maiuscola}</code></p><label>Template, uno per riga</label><textarea id="templates">{parola}-{animale}-{anno}
+{nome}-{animale}-{anno}
+{persona}-{pet}-{anno}
+{nomeanimale}-{numero}
+@{parola}!!{numero}{maiuscola}
+{comune}_{anno}
+{cognome}{numero}
+{mese}{simbolo}{anno}</textarea><div class="cols"><label>Limite massimo combinazioni<select id="limit"><option>10000</option><option>50000</option><option selected>250000</option><option>500000</option><option>1000000</option></select></label><label><input id="caseVariants" type="checkbox" checked> Varianti maiuscole/minuscole</label><label><input id="dedupe" type="checkbox" checked> Elimina duplicati</label></div><div class="row"><button id="generateBtn">Genera wordlist</button><button id="exportWordlistBtn">Esporta TXT</button><button id="copyWordlistBtn">Copia</button><button id="clearWordlistBtn">Pulisci wordlist</button></div><div id="generatorReport" class="status">Wordlist non ancora generata.</div><textarea id="wordlistOutput" class="output" readonly></textarea></section>
 
-    <section class="card">
-      <h2>2. Verifica ZIP cifrato</h2>
-      <p>Il browser non prova direttamente le password. Usa lo script Python incluso nella cartella scaricata.</p>
-      <ol>
-        <li>Scarica <code>wordlist.txt</code>.</li>
-        <li>Metti lo ZIP cifrato e <code>wordlist.txt</code> nella stessa cartella dello script.</li>
-        <li>Apri Terminale nella cartella ed esegui:</li>
-      </ol>
-      <pre>python3 keyback_zip_recovery.py TestProtetto.zip wordlist.txt</pre>
-      <p class="note">Uso previsto: solo archivi propri o autorizzati. Lo script mostra tentativi, velocità e risultato.</p>
-    </section>
-
-    <section class="card">
-      <h2>3. Report</h2>
-      <p>Il report reale viene prodotto dallo script Python durante la verifica:</p>
-      <pre>report_keyback.txt</pre>
-    </section>
-  </main>
-  <script src="app.js"></script>
-</body>
-</html>
+<section class="card"><h2>7. Verifica ZIP con Python locale</h2><p>La PWA genera la wordlist e analizza lo ZIP. Per provare davvero le password sul tuo ZIP cifrato usa lo script incluso <code>keyback_zip_recovery.py</code> da Terminale.</p><ol><li>Premi <b>Esporta TXT</b> nella sezione Wordlist Engine.</li><li>Metti lo ZIP e la wordlist dove preferisci, ad esempio sulla Scrivania e in Download.</li><li>Esegui il comando qui sotto, adattando i percorsi.</li></ol><pre class="cmd">cd ~/Desktop/keyback-local-wordlist-engine-v2
+python3 keyback_zip_recovery.py ~/Desktop/TestProtetto.zip ~/Downloads/keyback-wordlist.txt</pre><p class="status">Il report finale viene creato come <b>report_keyback.txt</b>. Uso previsto: solo archivi propri o autorizzati.</p></section>
+</main><footer>Uso previsto: recupero personale/autorizzato. Gli ZIP cifrati non rivelano caratteri singoli: si verifica solo tentativo corretto/sbagliato.</footer><script src="app.js"></script></body></html>
