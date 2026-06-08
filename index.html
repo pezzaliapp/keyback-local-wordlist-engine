@@ -1,95 +1,119 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="description" content="KeyBack Local - analisi locale file, ZIP e motore wordlist personale">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>KeyBack Local</title>
-  <meta name="theme-color" content="#0b1020" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <main class="wrap">
-    <header class="hero">
-      <h1>🔐 KeyBack Local</h1>
-      <p>Motore locale per generare wordlist personali da template, dizionari e regole.</p>
-    </header>
+<div class="app-container">
+  <header class="app-header">
+    <div><h1>🔐 KeyBack Local</h1><p class="subtitle">Analisi locale file + ZIP + motore wordlist personale da template e dizionari.</p></div>
+    <button id="installBtn" class="install-btn hidden">⬇️ Installa</button>
+  </header>
 
-    <section class="panel">
-      <h2>1. Dizionari</h2>
-      <div class="grid two">
-        <div>
-          <label>Parole personali, una per riga</label>
-          <textarea id="customWords" rows="8" spellcheck="false">Parma
+  <main class="app-main">
+    <section class="card">
+      <h2>Strumenti</h2>
+      <div class="mode-selector">
+        <button class="mode-btn active" data-mode="files">📁 Scansiona File<br><small>ZIP, txt, config, log</small></button>
+        <button class="mode-btn" data-mode="text">📝 Testo Libero<br><small>Incolla e analizza</small></button>
+        <button class="mode-btn" data-mode="generator">🧠 Wordlist Engine<br><small>Dizionari + template</small></button>
+        <button class="mode-btn" data-mode="info">ℹ️ Limiti<br><small>ZIP cifrati e browser</small></button>
+      </div>
+
+      <div id="filesOptions" class="mode-options">
+        <div class="form-group">
+          <label>Seleziona file singoli, ZIP o una cartella</label>
+          <div class="button-row">
+            <button class="btn-secondary" id="browseFilesBtn" type="button">📄 Scegli file</button>
+            <button class="btn-secondary" id="browseFolderBtn" type="button">📂 Scegli cartella</button>
+          </div>
+          <input type="file" id="fileInput" multiple hidden>
+          <input type="file" id="folderInput" webkitdirectory multiple hidden>
+          <div id="fileInfo" class="info-text">Nessun file selezionato.</div>
+        </div>
+        <button id="scanBtn" class="btn-primary" type="button">🔎 Avvia scansione locale</button>
+      </div>
+
+      <div id="textOptions" class="mode-options hidden">
+        <div class="form-group"><label>Incolla testo da controllare</label><textarea id="textInput" rows="10" placeholder="Incolla configurazioni, log, file .env, JSON..."></textarea></div>
+        <button id="scanTextBtn" class="btn-primary" type="button">🔎 Analizza testo</button>
+      </div>
+
+      <div id="generatorOptions" class="mode-options hidden">
+        <div class="notice safe">Uso previsto: recupero di archivi propri o autorizzati. Il generatore crea tentativi realistici; non scopre caratteri nascosti dentro uno ZIP cifrato.</div>
+        <h3>1. Dizionari</h3>
+        <div class="grid-2">
+          <div class="form-group"><label>Parole personali, una per riga</label><textarea id="customWords" rows="7" spellcheck="false">Parma
 Cane
 Oggi
 Listino
-Cliente</textarea>
-        </div>
-        <div>
-          <label>Numeri / anni, uno per riga</label>
-          <textarea id="numbers" rows="8" spellcheck="false">2024
+Cliente</textarea></div>
+          <div class="form-group"><label>Numeri / anni, uno per riga</label><textarea id="numbers" rows="7" spellcheck="false">2024
 2025
 2026
 43
-123</textarea>
+123</textarea></div>
         </div>
-      </div>
+        <div class="checkbox-grid">
+          <label><input type="checkbox" class="dict" value="nomi_it" checked> Nomi italiani</label>
+          <label><input type="checkbox" class="dict" value="cognomi_it"> Cognomi italiani</label>
+          <label><input type="checkbox" class="dict" value="comuni_it" checked> Comuni italiani</label>
+          <label><input type="checkbox" class="dict" value="animali_it" checked> Animali</label>
+          <label><input type="checkbox" class="dict" value="parole_it"> Parole italiane comuni</label>
+          <label><input type="checkbox" class="dict" value="mesi_it" checked> Mesi</label>
+        </div>
+        <div class="button-row"><input id="importDict" type="file" accept=".txt,.csv" multiple><button id="loadDictBtn" class="btn-secondary" type="button">📚 Aggiorna dizionari</button></div>
+        <div id="dictStatus" class="info-text">Dizionari in attesa.</div>
 
-      <div class="dicts">
-        <label><input type="checkbox" class="dict" value="nomi_it" checked> Nomi italiani</label>
-        <label><input type="checkbox" class="dict" value="cognomi_it"> Cognomi italiani</label>
-        <label><input type="checkbox" class="dict" value="comuni_it" checked> Comuni italiani</label>
-        <label><input type="checkbox" class="dict" value="animali_it" checked> Animali</label>
-        <label><input type="checkbox" class="dict" value="parole_it"> Parole italiane comuni</label>
-      </div>
-
-      <div class="row">
-        <input id="importDict" type="file" accept=".txt,.csv" multiple />
-        <button id="loadBuiltins">📚 Carica dizionari selezionati</button>
-      </div>
-      <p id="dictStatus" class="note">Dizionari caricati: solo parole personali.</p>
-    </section>
-
-    <section class="panel">
-      <h2>2. Template</h2>
-      <p class="note">Usa segnaposto come <code>{word}</code>, <code>{word2}</code>, <code>{num}</code>, <code>{sym}</code>, <code>{upper}</code>, <code>{lower}</code>.</p>
-      <textarea id="templates" rows="8" spellcheck="false">{word}-{word2}-{num}
+        <h3>2. Template</h3>
+        <p class="info-text">Segnaposto: <code>{word}</code>, <code>{word2}</code>, <code>{num}</code>, <code>{sym}</code>, <code>{upper}</code>, <code>{lower}</code>.</p>
+        <textarea id="templates" rows="7" spellcheck="false">{word}-{word2}-{num}
 {Upper}{sym}{num}
 @{lower}!!{num}A
 {word}_{num}
 {Upper}{num}!</textarea>
-      <div class="grid four">
-        <div><label>Simboli</label><input id="symbols" value="- _ . ! @ # !!" /></div>
-        <div><label>Limite massimo</label><input id="limit" type="number" min="100" max="2000000" value="100000" /></div>
-        <div><label>Lunghezza min</label><input id="minLen" type="number" min="1" value="4" /></div>
-        <div><label>Lunghezza max</label><input id="maxLen" type="number" min="4" value="32" /></div>
+        <div class="grid-4">
+          <div class="form-group"><label>Simboli</label><input id="symbols" value="- _ . ! @ # !!"></div>
+          <div class="form-group"><label>Limite massimo</label><input id="limit" type="number" min="100" max="2000000" value="100000"></div>
+          <div class="form-group"><label>Lunghezza min</label><input id="minLen" type="number" min="1" value="4"></div>
+          <div class="form-group"><label>Lunghezza max</label><input id="maxLen" type="number" min="4" value="32"></div>
+        </div>
+        <div class="checkbox-grid">
+          <label><input id="caseVariants" type="checkbox" checked> varianti maiuscole/minuscole</label>
+          <label><input id="dedupe" type="checkbox" checked> rimuovi duplicati</label>
+          <label><input id="includeDirect" type="checkbox" checked> includi parole dirette</label>
+        </div>
+        <div class="button-row">
+          <button id="generateBtn" class="btn-primary" type="button">🧠 Genera combinazioni</button>
+          <button id="exportWordlistBtn" class="btn-secondary" type="button">⬇️ Esporta TXT</button>
+          <button id="copyWordlistBtn" class="btn-secondary" type="button">📋 Copia</button>
+          <button id="clearWordlistBtn" class="btn-secondary" type="button">🗑️ Pulisci</button>
+        </div>
+        <div class="summary-stats"><div class="stat-item"><div id="wordCount" class="stat-number">0</div><div class="stat-label">parole base</div></div><div class="stat-item"><div id="generatedCount" class="stat-number">0</div><div class="stat-label">generate</div></div><div class="stat-item"><div id="templateCount" class="stat-number">0</div><div class="stat-label">template</div></div></div>
+        <textarea id="wordlistOutput" rows="13" readonly spellcheck="false" placeholder="Qui appariranno le combinazioni generate..."></textarea>
       </div>
-      <div class="checks">
-        <label><input id="caseVariants" type="checkbox" checked> aggiungi varianti maiuscole/minuscole</label>
-        <label><input id="dedupe" type="checkbox" checked> rimuovi duplicati</label>
-      </div>
-      <div class="row">
-        <button id="generate" class="primary">🧠 Genera combinazioni</button>
-        <button id="clear">🗑️ Pulisci</button>
+
+      <div id="infoOptions" class="mode-options hidden">
+        <div class="notice warning"><strong>ZIP cifrati:</strong> la PWA può riconoscere file protetti e generare wordlist, ma non forza password nel browser.</div>
+        <div class="notice safe"><strong>Locale:</strong> i file restano nel browser. I dizionari vengono caricati dalla cartella <code>wordlists</code> o importati da te.</div>
+        <div class="notice"><strong>GitHub Pages:</strong> consigliato rispetto al doppio clic su <code>index.html</code>, perché abilita fetch dei dizionari e Service Worker.</div>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>3. Risultato</h2>
-      <div class="stats">
-        <div><b id="count">0</b><span>generate</span></div>
-        <div><b id="dictCount">0</b><span>parole base</span></div>
-        <div><b id="templateCount">0</b><span>template</span></div>
-      </div>
-      <div class="row">
-        <button id="exportTxt">⬇️ Esporta TXT</button>
-        <button id="copy">📋 Copia</button>
-      </div>
-      <textarea id="output" rows="14" readonly spellcheck="false"></textarea>
-      <p class="note warn">Uso previsto: recupero di archivi propri o autorizzati. L’app genera tentativi: non scopre caratteri nascosti dentro uno ZIP cifrato.</p>
-    </section>
+    <section id="progressSection" class="card hidden"><h2>Attività</h2><div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div><p id="progressStatus" class="progress-status">Pronto.</p><div id="progressLog" class="progress-log"></div></section>
+
+    <section id="resultsSection" class="card hidden"><div class="results-header"><h2>Risultati scansione</h2><div class="results-actions"><button class="btn-secondary" id="exportBtn">⬇️ JSON</button><button class="btn-secondary" id="exportCsvBtn">⬇️ CSV</button><button class="btn-secondary" id="clearBtn">🗑️ Cancella</button></div></div><div id="summaryStats" class="summary-stats"></div><div id="resultsList"></div></section>
   </main>
-  <script src="app.js"></script>
+  <footer class="app-footer">KeyBack Local — usare solo su file propri o autorizzati.</footer>
+</div>
+<script src="./app.js"></script>
 </body>
 </html>
