@@ -1,0 +1,47 @@
+Parma
+Prato
+Milano
+Roma
+Torino
+Bologna
+Firenze
+Napoli
+Genova
+Venezia
+Livorno
+Civitanova
+Civitanova Marche
+Correggio
+Modena
+Reggio Emilia
+Catania
+Olbia
+Palermo
+Bari
+Verona
+Padova
+Trieste
+Brescia
+Bergamo
+Perugia
+Ancona
+Rimini
+Ravenna
+Ferrara
+Piacenza
+Mantova
+Lucca
+Pisa
+Siena
+Arezzo
+Grosseto
+Massa
+Carrara
+La Spezia
+Savona
+Como
+Lecco
+Varese
+Pavia
+Cremona
+Lodi

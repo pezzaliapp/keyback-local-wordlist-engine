@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyBack Local</title>
+  <meta name="theme-color" content="#0b1020" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <h1>🔐 KeyBack Local</h1>
+      <p>Motore locale per generare wordlist personali da template, dizionari e regole.</p>
+    </header>
+
+    <section class="panel">
+      <h2>1. Dizionari</h2>
+      <div class="grid two">
+        <div>
+          <label>Parole personali, una per riga</label>
+          <textarea id="customWords" rows="8" spellcheck="false">Parma
+Cane
+Oggi
+Listino
+Cliente</textarea>
+        </div>
+        <div>
+          <label>Numeri / anni, uno per riga</label>
+          <textarea id="numbers" rows="8" spellcheck="false">2024
+2025
+2026
+43
+123</textarea>
+        </div>
+      </div>
+
+      <div class="dicts">
+        <label><input type="checkbox" class="dict" value="nomi_it" checked> Nomi italiani</label>
+        <label><input type="checkbox" class="dict" value="cognomi_it"> Cognomi italiani</label>
+        <label><input type="checkbox" class="dict" value="comuni_it" checked> Comuni italiani</label>
+        <label><input type="checkbox" class="dict" value="animali_it" checked> Animali</label>
+        <label><input type="checkbox" class="dict" value="parole_it"> Parole italiane comuni</label>
+      </div>
+
+      <div class="row">
+        <input id="importDict" type="file" accept=".txt,.csv" multiple />
+        <button id="loadBuiltins">📚 Carica dizionari selezionati</button>
+      </div>
+      <p id="dictStatus" class="note">Dizionari caricati: solo parole personali.</p>
+    </section>
+
+    <section class="panel">
+      <h2>2. Template</h2>
+      <p class="note">Usa segnaposto come <code>{word}</code>, <code>{word2}</code>, <code>{num}</code>, <code>{sym}</code>, <code>{upper}</code>, <code>{lower}</code>.</p>
+      <textarea id="templates" rows="8" spellcheck="false">{word}-{word2}-{num}
+{Upper}{sym}{num}
+@{lower}!!{num}A
+{word}_{num}
+{Upper}{num}!</textarea>
+      <div class="grid four">
+        <div><label>Simboli</label><input id="symbols" value="- _ . ! @ # !!" /></div>
+        <div><label>Limite massimo</label><input id="limit" type="number" min="100" max="2000000" value="100000" /></div>
+        <div><label>Lunghezza min</label><input id="minLen" type="number" min="1" value="4" /></div>
+        <div><label>Lunghezza max</label><input id="maxLen" type="number" min="4" value="32" /></div>
+      </div>
+      <div class="checks">
+        <label><input id="caseVariants" type="checkbox" checked> aggiungi varianti maiuscole/minuscole</label>
+        <label><input id="dedupe" type="checkbox" checked> rimuovi duplicati</label>
+      </div>
+      <div class="row">
+        <button id="generate" class="primary">🧠 Genera combinazioni</button>
+        <button id="clear">🗑️ Pulisci</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3. Risultato</h2>
+      <div class="stats">
+        <div><b id="count">0</b><span>generate</span></div>
+        <div><b id="dictCount">0</b><span>parole base</span></div>
+        <div><b id="templateCount">0</b><span>template</span></div>
+      </div>
+      <div class="row">
+        <button id="exportTxt">⬇️ Esporta TXT</button>
+        <button id="copy">📋 Copia</button>
+      </div>
+      <textarea id="output" rows="14" readonly spellcheck="false"></textarea>
+      <p class="note warn">Uso previsto: recupero di archivi propri o autorizzati. L’app genera tentativi: non scopre caratteri nascosti dentro uno ZIP cifrato.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
