@@ -3,116 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KeyBack Local v5</title>
+  <title>KeyBack Local Recovery</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="manifest.json">
 </head>
 <body>
-<header class="hero">
-  <div>
-    <h1>KeyBack Local <span>v5</span></h1>
-    <p>Analisi locale file/ZIP e generatore avanzato di wordlist personali.</p>
-  </div>
-  <button id="installBtn" hidden>Installa PWA</button>
-</header>
+  <main class="wrap">
+    <header class="hero">
+      <h1>🔐 KeyBack Local Recovery <span>v1</span></h1>
+      <p>Genera una wordlist personale e verifica uno ZIP cifrato con lo script Python locale incluso.</p>
+    </header>
 
-<main class="grid">
-  <section class="card wide">
-    <h2>1. Scansione file / ZIP</h2>
-    <p class="muted">Carica file, cartelle o ZIP. L'app lavora nel browser: niente upload online.</p>
-    <div class="actions">
-      <label class="filebtn">Scegli file
-        <input id="fileInput" type="file" multiple>
+    <section class="card">
+      <h2>1. Wordlist personale</h2>
+      <div class="grid">
+        <label>Parole personali, una per riga
+          <textarea id="words">Alessandro
+Parma
+Cane
+Oggi
+Listino
+Cliente
+Carlotta
+Luna
+Mare
+Casa</textarea>
+        </label>
+        <label>Anni / numeri, uno per riga
+          <textarea id="nums">2024
+2025
+2026
+43
+123
+666</textarea>
+        </label>
+      </div>
+      <div class="grid small">
+        <label>Simboli / separatori
+          <input id="seps" value="- _ . ! @ !! #">
+        </label>
+        <label>Limite combinazioni
+          <input id="limit" type="number" value="250000" min="100" max="2000000">
+        </label>
+      </div>
+      <label>Template, uno per riga
+        <textarea id="templates">{word}-{word}-{num}
+{word}_{word}_{num}
+{word}{num}
+{word}{sep}{num}
+@{word}!!{num}{cap}
+{word}{sep}{word}
+{word}{sep}{word}{sep}{num}</textarea>
       </label>
-      <label class="filebtn">Scegli cartella
-        <input id="folderInput" type="file" multiple webkitdirectory directory>
-      </label>
-      <button id="clearScan">Pulisci risultati</button>
-      <button id="exportScan">Esporta risultati</button>
-    </div>
-    <div id="scanSummary" class="summary">Nessun file caricato.</div>
-    <pre id="scanOutput" class="output"></pre>
-  </section>
+      <div class="actions">
+        <button id="gen">Genera wordlist</button>
+        <button id="download" disabled>Scarica wordlist.txt</button>
+        <button id="copy" disabled>Copia</button>
+      </div>
+      <p id="stats" class="note">Pronto.</p>
+      <pre id="preview"></pre>
+    </section>
 
-  <section class="card">
-    <h2>2. Dizionari</h2>
-    <p class="muted">Seleziona categorie interne o importa TXT/CSV personali.</p>
-    <div class="checks">
-      <label><input type="checkbox" class="dictCheck" value="nomi_it" checked> Nomi IT</label>
-      <label><input type="checkbox" class="dictCheck" value="cognomi_it"> Cognomi IT</label>
-      <label><input type="checkbox" class="dictCheck" value="comuni_it"> Comuni IT</label>
-      <label><input type="checkbox" class="dictCheck" value="animali_it" checked> Specie animali IT</label>
-      <label><input type="checkbox" class="dictCheck" value="nomi_animali_it" checked> Nomi animali domestici</label>
-      <label><input type="checkbox" class="dictCheck" value="mesi_it"> Mesi IT</label>
-      <label><input type="checkbox" class="dictCheck" value="parole_it"> Parole IT</label>
-      <label><input type="checkbox" class="dictCheck" value="anni" checked> Anni completi</label>
-      <label><input type="checkbox" class="dictCheck" value="numeri" checked> Numeri completi</label>
-      <label><input type="checkbox" class="dictCheck" value="simboli"> Simboli</label>
-    </div>
-    <label class="filebtn full">Importa dizionario TXT/CSV
-      <input id="dictImport" type="file" accept=".txt,.csv" multiple>
-    </label>
-    <button id="loadDicts">Carica / aggiorna dizionari</button>
-    <div id="dictStatus" class="summary">Dizionari non ancora caricati.</div>
-  </section>
+    <section class="card">
+      <h2>2. Verifica ZIP cifrato</h2>
+      <p>Il browser non prova direttamente le password. Usa lo script Python incluso nella cartella scaricata.</p>
+      <ol>
+        <li>Scarica <code>wordlist.txt</code>.</li>
+        <li>Metti lo ZIP cifrato e <code>wordlist.txt</code> nella stessa cartella dello script.</li>
+        <li>Apri Terminale nella cartella ed esegui:</li>
+      </ol>
+      <pre>python3 keyback_zip_recovery.py TestProtetto.zip wordlist.txt</pre>
+      <p class="note">Uso previsto: solo archivi propri o autorizzati. Lo script mostra tentativi, velocità e risultato.</p>
+    </section>
 
-  <section class="card">
-    <h2>3. Numeri / anni completi</h2>
-    <label>Anno iniziale
-      <input id="yearStart" type="number" value="1950">
-    </label>
-    <label>Anno finale
-      <input id="yearEnd" type="number" value="2035">
-    </label>
-    <label>Numero minimo
-      <input id="numStart" type="number" value="0">
-    </label>
-    <label>Numero massimo
-      <input id="numEnd" type="number" value="9999">
-    </label>
-    <label>Padding numeri
-      <select id="paddingMode">
-        <option value="both">0, 1, 01, 001, 0001</option>
-        <option value="plain">Solo normali: 1, 2, 10</option>
-        <option value="pad2">2 cifre: 01</option>
-        <option value="pad4">4 cifre: 0001</option>
-      </select>
-    </label>
-  </section>
-
-  <section class="card wide">
-    <h2>4. Template combinazioni</h2>
-    <p class="muted">Una regola per riga. Placeholder: {parola}, {nome}, {cognome}, {comune}, {animale} / {specie} / {pet}, {mese}, {anno}, {numero}, {simbolo}, {maiuscola}, {minuscola}.</p>
-    <textarea id="templates" rows="8">{parola}-{animale} / {specie} / {pet}-{anno}
-{nome}-{animale} / {specie} / {pet}-{anno}
-{nome}{anno}!
-@{parola}!!{numero}{maiuscola}
-{comune}_{anno}
-{cognome}{numero}
-{parola}{simbolo}{anno}</textarea>
-    <div class="row">
-      <label>Limite massimo combinazioni
-        <select id="limit">
-          <option>1000</option>
-          <option selected>10000</option>
-          <option>50000</option>
-          <option>100000</option>
-          <option>250000</option>
-        </select>
-      </label>
-      <label><input id="caseVariants" type="checkbox" checked> Varianti maiuscole/minuscole</label>
-      <label><input id="dedupe" type="checkbox" checked> Elimina duplicati</label>
-    </div>
-    <div class="actions">
-      <button id="generate">Genera wordlist</button>
-      <button id="exportWordlist">Esporta TXT</button>
-      <button id="copyWordlist">Copia</button>
-    </div>
-    <div id="genStatus" class="summary">Nessuna wordlist generata.</div>
-    <textarea id="wordlistOut" rows="14" spellcheck="false"></textarea>
-  </section>
-</main>
-<footer>Uso previsto: recupero personale/autorizzato. Gli ZIP cifrati non rivelano caratteri singoli della password: si verifica solo tentativo corretto/sbagliato.</footer>
-<script src="app.js"></script>
+    <section class="card">
+      <h2>3. Report</h2>
+      <p>Il report reale viene prodotto dallo script Python durante la verifica:</p>
+      <pre>report_keyback.txt</pre>
+    </section>
+  </main>
+  <script src="app.js"></script>
 </body>
 </html>
