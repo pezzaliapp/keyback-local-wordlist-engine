@@ -1,172 +1,160 @@
 const $ = id => document.getElementById(id);
-const state = { files: [], results: [], deferredPrompt: null, externalWords: [], lastWordlist: [] };
-const WORDLIST_FILES = ['nomi_it.txt','cognomi_it.txt','comuni_it.txt','animali_it.txt','parole_it.txt','mesi_it.txt'];
-const BUILTIN = {
-  nomi_it:['Alessandro','Andrea','Luca','Marco','Matteo','Paolo','Giovanni','Francesco','Giuseppe','Roberto','Stefano','Davide','Michele','Antonio','Anna','Maria','Giulia','Francesca','Sara','Laura','Elena','Chiara','Paola','Silvia','Carlotta'],
-  cognomi_it:['Rossi','Russo','Ferrari','Esposito','Bianchi','Romano','Colombo','Ricci','Marino','Greco','Bruno','Gallo','Conti','De Luca','Mancini','Costa','Giordano','Rizzo','Lombardi','Moretti','Barbieri','Fontana'],
-  comuni_it:['Parma','Prato','Milano','Roma','Torino','Bologna','Firenze','Napoli','Genova','Venezia','Livorno','Civitanova','Correggio','Modena','Reggio Emilia','Catania','Olbia','Palermo','Bari'],
-  animali_it:['Cane','Gatto','Lupo','Leone','Tigre','Aquila','Orso','Cavallo','Volpe','Falco','Delfino','Balena','Ragno','Fenicottero','Gabbiano'],
-  parole_it:['oggi','domani','estate','inverno','mare','luna','sole','lavoro','cliente','listino','prezzi','fattura','ordine','backup','archivio','documento','ufficio','azienda','fornitore'],
-  mesi_it:['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
+let deferredPrompt = null;
+let dictionaries = {};
+let importedWords = [];
+let lastScan = [];
+let lastWordlist = [];
+
+const BUILTIN_FILES = {
+  nomi_it: './wordlists/nomi_it.txt',
+  cognomi_it: './wordlists/cognomi_it.txt',
+  comuni_it: './wordlists/comuni_it.txt',
+  animali_it: './wordlists/animali_it.txt',
+  nomi_animali_it: './wordlists/nomi_animali_it.txt',
+  mesi_it: './wordlists/mesi_it.txt',
+  parole_it: './wordlists/parole_it.txt'
 };
+const SYMBOLS = ['!','!!','?','@','#','-','_','.','*'];
+const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('');
 
-window.addEventListener('DOMContentLoaded', init);
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); state.deferredPrompt = e; $('installBtn').classList.remove('hidden'); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; $('installBtn').hidden = false; });
+$('installBtn')?.addEventListener('click', async()=>{ if(deferredPrompt){ deferredPrompt.prompt(); deferredPrompt=null; $('installBtn').hidden=true; }});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
-function init(){
-  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
-  $('browseFilesBtn').addEventListener('click', () => $('fileInput').click());
-  $('browseFolderBtn').addEventListener('click', () => $('folderInput').click());
-  $('fileInput').addEventListener('change', e => setFiles([...e.target.files]));
-  $('folderInput').addEventListener('change', e => setFiles([...e.target.files]));
-  $('scanBtn').addEventListener('click', () => startScan('files'));
-  $('scanTextBtn').addEventListener('click', () => startScan('text'));
-  $('generateBtn').addEventListener('click', generateWordlist);
-  $('exportWordlistBtn').addEventListener('click', exportWordlist);
-  $('copyWordlistBtn').addEventListener('click', copyWordlist);
-  $('clearWordlistBtn').addEventListener('click', clearWordlist);
-  $('importDict').addEventListener('change', e => importDictionaries(e.target.files));
-  $('loadDictBtn').addEventListener('click', updateDictionaryCount);
-  document.querySelectorAll('.dict').forEach(cb => cb.addEventListener('change', updateDictionaryCount));
-  $('exportBtn').addEventListener('click', exportResults);
-  $('exportCsvBtn').addEventListener('click', exportResultsCSV);
-  $('clearBtn').addEventListener('click', clearResults);
-  $('installBtn').addEventListener('click', installApp);
-  if('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js');
-  autoLoadWordlists(); updateDictionaryCount();
-}
+function splitWords(text){ return text.split(/[\r\n,;]+/).map(x=>x.trim()).filter(Boolean); }
+function uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
+function downloadText(name, text){ const blob=new Blob([text],{type:'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+function addLog(line){ lastScan.push(line); $('scanOutput').textContent = lastScan.join('\n'); }
 
-function setMode(mode){
-  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-  ['files','text','generator','info'].forEach(m => $(m+'Options').classList.toggle('hidden', m !== mode));
-}
-function setFiles(files){ state.files = files; const total = files.reduce((s,f)=>s+f.size,0); $('fileInfo').textContent = `${files.length} file selezionati - ${formatBytes(total)}`; }
+async function readTextFile(file){ return await file.text(); }
+async function readArrayBuffer(file){ return await file.arrayBuffer(); }
 
-async function startScan(kind){
-  showProgress(true); state.results = [];
-  try{
-    if(kind === 'text'){
-      const text = $('textInput').value || ''; scanText('testo-incollato', text); setProgress(100,'Analisi testo completata.');
-    } else {
-      if(!state.files.length){ alert('Seleziona prima uno o più file.'); showProgress(false); return; }
-      await scanFiles(state.files);
-    }
-  }catch(e){ log('Errore: ' + e.message, 'critical'); }
-  renderResults();
-}
-
-async function scanFiles(files){
-  for(let i=0;i<files.length;i++){
-    const file = files[i]; setProgress(Math.round((i/files.length)*100), `Analisi ${file.name}...`); log(`Controllo: ${file.webkitRelativePath || file.name}`);
-    const name = file.name.toLowerCase();
-    if(name.endsWith('.zip')) await analyzeZip(file);
-    else if(isLikelyText(file)) scanText(file.webkitRelativePath || file.name, await file.text());
-    else addResult({type:'INFO', severity:'info', file:file.webkitRelativePath||file.name, message:'File binario/non testuale ignorato', evidence:formatBytes(file.size)});
+function inspectZip(buffer, name){
+  const bytes = new Uint8Array(buffer); let pos=0, entries=0, encrypted=0, names=[];
+  while(pos < bytes.length-30){
+    const sig = bytes[pos] | bytes[pos+1]<<8 | bytes[pos+2]<<16 | bytes[pos+3]<<24;
+    if(sig === 0x04034b50){
+      const flags = bytes[pos+6] | (bytes[pos+7]<<8);
+      const comp = bytes[pos+8] | (bytes[pos+9]<<8);
+      const nameLen = bytes[pos+26] | (bytes[pos+27]<<8);
+      const extraLen = bytes[pos+28] | (bytes[pos+29]<<8);
+      const fname = new TextDecoder().decode(bytes.slice(pos+30, pos+30+nameLen));
+      entries++; if(flags & 1) encrypted++; names.push(`${fname}  ${flags&1?'[cifrato]':'[non cifrato]'} metodo:${comp}`);
+      const compSize = bytes[pos+18] | bytes[pos+19]<<8 | bytes[pos+20]<<16 | bytes[pos+21]<<24;
+      pos += 30 + nameLen + extraLen + Math.max(0, compSize);
+    } else pos++;
   }
-  setProgress(100,'Scansione completata.');
+  addLog(`\nZIP: ${name}`);
+  addLog(`  File interni trovati: ${entries}`);
+  addLog(`  File cifrati: ${encrypted}`);
+  names.slice(0,80).forEach(n=>addLog(`  - ${n}`));
+  if(names.length>80) addLog(`  ... altri ${names.length-80} file`);
+  if(encrypted) addLog(`  Nota: ZIP cifrato. La PWA può segnalarlo e generare wordlist, non verificare la password nel browser.`);
 }
-function isLikelyText(file){
-  const n=file.name.toLowerCase(); return /\.(txt|csv|json|xml|html|css|js|ts|py|env|ini|conf|config|log|md|yaml|yml)$/i.test(n) || (file.type && file.type.startsWith('text/'));
-}
-function scanText(fileName,text){
+
+function scanText(text, name){
   const patterns = [
-    {name:'PASSWORD', rx:/(password|passwd|pwd|pass)\s*[:=]\s*["']?([^\s"']{4,})/gi, severity:'warning'},
-    {name:'TOKEN/API KEY', rx:/(api[_-]?key|token|secret|client_secret)\s*[:=]\s*["']?([^\s"']{8,})/gi, severity:'warning'},
-    {name:'EMAIL', rx:/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, severity:'info'},
-    {name:'PRIVATE KEY', rx:/-----BEGIN [A-Z ]*PRIVATE KEY-----/gi, severity:'critical'}
+    /password\s*[:=]\s*[^\s'\"]+/ig, /pass\s*[:=]\s*[^\s'\"]+/ig, /pwd\s*[:=]\s*[^\s'\"]+/ig,
+    /token\s*[:=]\s*[^\s'\"]+/ig, /secret\s*[:=]\s*[^\s'\"]+/ig, /api[_-]?key\s*[:=]\s*[^\s'\"]+/ig
   ];
-  let found=0;
-  for(const p of patterns){ let m; while((m=p.rx.exec(text))!==null){ found++; addResult({type:p.name,severity:p.severity,file:fileName,message:'Possibile dato sensibile trovato',evidence:mask(snippet(text,m.index))}); } }
-  if(!found) addResult({type:'INFO',severity:'info',file:fileName,message:'Nessun pattern evidente trovato',evidence:`${text.length} caratteri analizzati`});
+  let hits=[]; patterns.forEach(rx=>{ const m=text.match(rx); if(m) hits.push(...m.slice(0,50)); });
+  addLog(`\nTESTO: ${name}`);
+  addLog(`  Dimensione: ${text.length} caratteri`);
+  addLog(`  Possibili credenziali trovate: ${hits.length}`);
+  hits.slice(0,30).forEach(h=>addLog(`  ⚠ ${h}`));
 }
 
-async function analyzeZip(file){
-  const buffer = await file.arrayBuffer(); const view = new DataView(buffer); const entries = parseZipEntries(view, buffer.byteLength);
-  const protectedCount = entries.filter(e=>e.encrypted).length;
-  addResult({type:'ZIP',severity:protectedCount?'warning':'info',file:file.name,message:`Trovati ${entries.length} elementi. Protetti: ${protectedCount}.`,evidence:entries.slice(0,20).map(e=>`${e.encrypted?'🔒':'📄'} ${e.name}`).join('\n')});
-  for(const e of entries){
-    if(e.encrypted){ addResult({type:'ZIP CIFRATO',severity:'warning',file:`${file.name}/${e.name}`,message:'File protetto da password. Usa il Wordlist Engine per creare una lista personale; la PWA non forza password nel browser.',evidence:'Cifratura rilevata nel flag ZIP.'}); continue; }
-    if(e.uncompressedSize > 1000000) continue;
-    const data = await extractZipEntry(buffer, e);
-    if(data && looksText(data)) scanText(`${file.name}/${e.name}`, new TextDecoder().decode(data));
+async function handleFiles(files){
+  for(const file of files){
+    const lower=file.name.toLowerCase();
+    $('scanSummary').textContent = `Analisi in corso: ${file.name}`;
+    try{
+      if(lower.endsWith('.zip')) inspectZip(await readArrayBuffer(file), file.webkitRelativePath || file.name);
+      else if(/\.(txt|csv|json|env|log|md|html|js|css|xml|ini|conf|yml|yaml)$/i.test(lower)) scanText(await readTextFile(file), file.webkitRelativePath || file.name);
+      else addLog(`\nSKIP: ${file.webkitRelativePath || file.name} (${file.type || 'tipo sconosciuto'})`);
+    }catch(e){ addLog(`\nERRORE ${file.name}: ${e.message}`); }
   }
+  $('scanSummary').textContent = `Analizzati ${files.length} elementi.`;
 }
-function parseZipEntries(view,total){
-  const entries=[]; let off=0;
-  while(off < total-30){
-    if(view.getUint32(off,true) !== 0x04034b50){ off++; continue; }
-    const flags=view.getUint16(off+6,true), method=view.getUint16(off+8,true), compSize=view.getUint32(off+18,true), uncompSize=view.getUint32(off+22,true);
-    const nameLen=view.getUint16(off+26,true), extraLen=view.getUint16(off+28,true);
-    const nameStart=off+30, dataStart=nameStart+nameLen+extraLen, dataEnd=dataStart+compSize;
-    if(dataEnd>total || nameLen<1) break;
-    const name=new TextDecoder().decode(new Uint8Array(view.buffer,nameStart,nameLen));
-    entries.push({name,encrypted:!!(flags&1),method,compressedSize:compSize,uncompressedSize:uncompSize,dataStart,dataEnd});
-    off=dataEnd;
-  }
-  return entries;
-}
-async function extractZipEntry(buffer,e){
-  const compressed = new Uint8Array(buffer.slice(e.dataStart,e.dataEnd));
-  if(e.method===0) return compressed;
-  if(e.method===8 && 'DecompressionStream' in window){
-    try{ const ds = new DecompressionStream('deflate-raw'); const stream = new Blob([compressed]).stream().pipeThrough(ds); return new Uint8Array(await new Response(stream).arrayBuffer()); }catch(err){ return null; }
-  }
-  return null;
-}
-function looksText(bytes){ let bad=0; const lim=Math.min(bytes.length,512); for(let i=0;i<lim;i++){ const b=bytes[i]; if(b===0 || (b<7 && b!==9 && b!==10 && b!==13)) bad++; } return bad < 5; }
+$('fileInput').addEventListener('change', e=>handleFiles([...e.target.files]));
+$('folderInput').addEventListener('change', e=>handleFiles([...e.target.files]));
+$('clearScan').addEventListener('click',()=>{lastScan=[];$('scanOutput').textContent='';$('scanSummary').textContent='Nessun file caricato.'});
+$('exportScan').addEventListener('click',()=>downloadText('keyback-risultati.txt', lastScan.join('\n')));
 
-async function autoLoadWordlists(){
-  if(location.protocol === 'file:'){ $('dictStatus').textContent='Aperta da file://: Safari/Chrome possono bloccare il caricamento automatico. Su GitHub Pages o localhost carica anche la cartella wordlists.'; return; }
-  let total=0;
-  for(const name of WORDLIST_FILES){ try{ const r=await fetch('./wordlists/'+name,{cache:'no-store'}); if(!r.ok) continue; const arr=parseWords(await r.text()); state.externalWords.push(...arr); total+=arr.length; }catch(e){} }
-  state.externalWords=unique(state.externalWords); $('dictStatus').textContent=`Caricati automaticamente ${total} termini dalla cartella wordlists.`; updateDictionaryCount();
+function makeYears(){
+  const a=Number($('yearStart').value), b=Number($('yearEnd').value); const out=[];
+  for(let y=Math.min(a,b); y<=Math.max(a,b); y++) out.push(String(y));
+  return out;
 }
-async function importDictionaries(files){ let added=0; for(const f of files){ const arr=parseWords(await f.text()); state.externalWords.push(...arr); added+=arr.length; } state.externalWords=unique(state.externalWords); $('dictStatus').textContent=`Importate ${added} voci. Totale dizionario esterno: ${state.externalWords.length}.`; updateDictionaryCount(); }
-function getWords(){
-  const base=[...lines($('customWords').value), ...state.externalWords];
-  document.querySelectorAll('.dict:checked').forEach(cb => base.push(...(BUILTIN[cb.value] || [])));
-  return unique(base.map(x=>x.trim()).filter(Boolean));
+function makeNumbers(){
+  const a=Number($('numStart').value), b=Number($('numEnd').value); const mode=$('paddingMode').value; const out=[];
+  for(let n=Math.min(a,b); n<=Math.max(a,b); n++){
+    if(mode==='plain') out.push(String(n));
+    else if(mode==='pad2') out.push(String(n).padStart(2,'0'));
+    else if(mode==='pad4') out.push(String(n).padStart(4,'0'));
+    else { out.push(String(n)); out.push(String(n).padStart(2,'0')); out.push(String(n).padStart(3,'0')); out.push(String(n).padStart(4,'0')); }
+  }
+  return uniq(out);
 }
-function updateDictionaryCount(){ const w=getWords(); $('wordCount').textContent=w.length.toLocaleString('it-IT'); return w; }
-function generateWordlist(){
-  const words=updateDictionaryCount(), nums=lines($('numbers').value), syms=tokens($('symbols').value), templ=lines($('templates').value);
-  const limit=clamp(parseInt($('limit').value||'100000',10),100,2000000), minLen=parseInt($('minLen').value||'1',10), maxLen=parseInt($('maxLen').value||'32',10);
-  const seen=new Set(), out=[]; const add=p=>{ if(!p || p.length<minLen || p.length>maxLen) return; if($('dedupe').checked){ if(seen.has(p)) return; seen.add(p); } out.push(p); };
-  if($('includeDirect').checked){ for(const w of words){ add(w); for(const n of nums) add(w+n); } }
-  outer: for(const t of templ){
-    for(const w1 of words){ const v1=$('caseVariants').checked?caseVariants(w1):[w1];
-      for(const a of v1){ for(const w2 of words){ const v2=$('caseVariants').checked?caseVariants(w2):[w2];
-        for(const b of v2){ for(const n of (nums.length?nums:[''])){ for(const s of (syms.length?syms:[''])){ add(fillTemplate(t,a,b,n,s)); if(out.length>=limit) break outer; }}}
-      }}
+
+async function loadDicts(){
+  dictionaries = {}; const selected=[...document.querySelectorAll('.dictCheck:checked')].map(x=>x.value);
+  for(const key of selected){
+    if(BUILTIN_FILES[key]){
+      try{ const txt=await fetch(BUILTIN_FILES[key], {cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject(new Error(r.status))); dictionaries[key]=splitWords(txt); }
+      catch{ dictionaries[key]=[]; }
     }
   }
-  state.lastWordlist=out; $('generatedCount').textContent=out.length.toLocaleString('it-IT'); $('templateCount').textContent=templ.length.toLocaleString('it-IT'); $('wordlistOutput').value=out.slice(0,50000).join('\n') + (out.length>50000?'\n... output visuale limitato: esporta TXT per tutto.':'');
+  if(selected.includes('anni')) dictionaries.anni = makeYears();
+  if(selected.includes('numeri')) dictionaries.numeri = makeNumbers();
+  if(selected.includes('simboli')) dictionaries.simboli = SYMBOLS;
+  dictionaries.importati = importedWords;
+  const total=Object.values(dictionaries).reduce((s,a)=>s+a.length,0);
+  $('dictStatus').textContent = `Categorie caricate: ${Object.entries(dictionaries).map(([k,v])=>`${k}:${v.length}`).join(' · ')} · Totale voci: ${total}`;
 }
-function fillTemplate(t,a,b,n,s){ const upper=cap(a), lower=a.toLowerCase(); return t.replaceAll('{word2}',b).replaceAll('{word}',a).replaceAll('{num}',n).replaceAll('{sym}',s).replaceAll('{upper}',upper).replaceAll('{Upper}',upper).replaceAll('{lower}',lower).replaceAll('{LOWER}',lower.toUpperCase()); }
-function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1).toLowerCase() : ''; }
-function lines(text){ return String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean); }
-function tokens(text){ return String(text||'').split(/\s+/).map(s=>s.trim()).filter(Boolean).map(s=>s==='vuoto'?'':s); }
-function parseWords(text){ return String(text||'').split(/[\r\n,;]+/).map(s=>s.trim()).filter(Boolean); }
-function caseVariants(w){ return unique([w,w.toLowerCase(),w.toUpperCase(),cap(w)]); }
-function unique(arr){ return [...new Set(arr)]; }
-function clamp(n,min,max){ return Math.min(max,Math.max(min,Number.isFinite(n)?n:min)); }
+$('loadDicts').addEventListener('click', loadDicts);
+$('dictImport').addEventListener('change', async e=>{ for(const f of e.target.files) importedWords.push(...splitWords(await f.text())); importedWords=uniq(importedWords); await loadDicts(); });
 
-function addResult(r){ state.results.push({...r,time:new Date().toISOString()}); }
-function renderResults(){ $('resultsSection').classList.remove('hidden'); const total=state.results.length, crit=state.results.filter(r=>r.severity==='critical').length, warn=state.results.filter(r=>r.severity==='warning').length, info=state.results.filter(r=>r.severity==='info').length; $('summaryStats').innerHTML=stat('totale',total)+stat('critici',crit)+stat('avvisi',warn)+stat('info',info); $('resultsList').innerHTML=state.results.map(r=>`<div class="result-card ${r.severity}"><div class="result-title"><span>${escapeHtml(r.type)}</span><small>${escapeHtml(r.file)}</small></div><p>${escapeHtml(r.message)}</p><div class="result-snippet">${escapeHtml(r.evidence||'')}</div></div>`).join(''); }
-function stat(label,value){ return `<div class="stat-item"><div class="stat-number">${value}</div><div class="stat-label">${label}</div></div>`; }
-function showProgress(show){ $('progressSection').classList.toggle('hidden',!show); if(show){ $('progressLog').innerHTML=''; setProgress(0,'Preparazione...'); } }
-function setProgress(p,t){ $('progressFill').style.width=p+'%'; $('progressStatus').textContent=t; }
-function log(t,cls=''){ $('progressLog').insertAdjacentHTML('beforeend',`<div class="log-entry ${cls}">${escapeHtml(t)}</div>`); $('progressLog').scrollTop=$('progressLog').scrollHeight; }
-function clearResults(){ state.results=[]; $('resultsSection').classList.add('hidden'); $('progressSection').classList.add('hidden'); }
-function clearWordlist(){ state.lastWordlist=[]; $('wordlistOutput').value=''; $('generatedCount').textContent='0'; }
-function downloadText(filename,text,type='text/plain'){ const blob=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href); }
-function exportResults(){ downloadText('keyback-local-report.json',JSON.stringify(state.results,null,2),'application/json'); }
-function exportResultsCSV(){ const rows=['tipo,severita,file,messaggio,evidenza',...state.results.map(r=>[r.type,r.severity,r.file,r.message,r.evidence].map(csv).join(','))]; downloadText('keyback-local-report.csv',rows.join('\n'),'text/csv'); }
-function exportWordlist(){ downloadText('keyback-wordlist.txt',state.lastWordlist.join('\n'),'text/plain;charset=utf-8'); }
-async function copyWordlist(){ await navigator.clipboard.writeText(state.lastWordlist.join('\n')); alert('Wordlist copiata negli appunti.'); }
-async function installApp(){ if(!state.deferredPrompt) return; state.deferredPrompt.prompt(); await state.deferredPrompt.userChoice; state.deferredPrompt=null; $('installBtn').classList.add('hidden'); }
-function formatBytes(bytes){ if(!bytes) return '0 B'; const u=['B','KB','MB','GB']; const i=Math.floor(Math.log(bytes)/Math.log(1024)); return `${(bytes/Math.pow(1024,i)).toFixed(1)} ${u[i]}`; }
-function snippet(text,index){ return text.slice(Math.max(0,index-70),Math.min(text.length,index+160)).replace(/\s+/g,' ').trim(); }
-function mask(value){ return String(value).replace(/([:=]\s*["']?)([^\s"']{4,})/g,(_,a,b)=>a+b.slice(0,2)+'••••'+b.slice(-2)); }
-function escapeHtml(v){ return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-function csv(v){ return '"'+String(v||'').replace(/"/g,'""')+'"'; }
+function pool(name){
+  const map = { parola:['parole_it','importati','nomi_it','animali_it'], nome:['nomi_it'], cognome:['cognomi_it'], comune:['comuni_it'], animale:['animali_it'], specie:['animali_it'], pet:['nomi_animali_it'], nomeanimale:['nomi_animali_it'], mese:['mesi_it'], anno:['anni'], numero:['numeri'], simbolo:['simboli'], maiuscola:['UPPER'], minuscola:['LOWER'] };
+  const keys = map[name] || [];
+  let out=[]; for(const k of keys){ if(k==='UPPER') out.push(...UPPER); else if(k==='LOWER') out.push(...LOWER); else out.push(...(dictionaries[k]||[])); }
+  return uniq(out).slice(0,50000);
+}
+function variants(s){
+  if(!$('caseVariants').checked) return [s];
+  const cap = s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+  return uniq([s, s.toLowerCase(), s.toUpperCase(), cap]);
+}
+async function generate(){
+  await loadDicts();
+  const templates=$('templates').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const limit=Number($('limit').value); const seen=new Set(); const out=[];
+  for(const tpl of templates){
+    const fields=[...tpl.matchAll(/\{(\w+)\}/g)].map(m=>m[1]);
+    if(!fields.length){ out.push(tpl); continue; }
+    const lists=fields.map(f=>pool(f));
+    if(lists.some(a=>!a.length)) continue;
+    const idx=new Array(lists.length).fill(0);
+    let guard=0;
+    while(out.length<limit && guard<limit*20){
+      guard++;
+      let s=tpl;
+      fields.forEach((f,i)=>{ s=s.replace(`{${f}}`, lists[i][idx[i]]); });
+      for(const v of variants(s)){
+        if(!$('dedupe').checked || !seen.has(v)){ seen.add(v); out.push(v); if(out.length>=limit) break; }
+      }
+      let p=lists.length-1;
+      while(p>=0){ idx[p]++; if(idx[p]<lists[p].length) break; idx[p]=0; p--; }
+      if(p<0) break;
+    }
+    if(out.length>=limit) break;
+  }
+  lastWordlist=out.slice(0,limit); $('wordlistOut').value=lastWordlist.join('\n');
+  $('genStatus').textContent = `Generate ${lastWordlist.length} combinazioni. Numeri: ${(dictionaries.numeri||[]).length}; Anni: ${(dictionaries.anni||[]).length}.`;
+}
+$('generate').addEventListener('click', generate);
+$('exportWordlist').addEventListener('click',()=>downloadText('keyback-wordlist.txt', lastWordlist.join('\n')));
+$('copyWordlist').addEventListener('click',()=>navigator.clipboard.writeText($('wordlistOut').value));
+loadDicts();
